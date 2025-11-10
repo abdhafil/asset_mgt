@@ -1,0 +1,44 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Asset {
+  id          Int           @id @default(autoincrement())
+  name        String        @unique
+  location    String
+  image       String?
+  description String
+  categoryId  Int
+  isActive    Boolean       @default(true)
+  category    Category      @relation(fields: [categoryId], references: [id])
+  maintenance Maintenance[]
+}
+
+model Category {
+  id       Int     @id @default(autoincrement())
+  name     String  @unique
+  isActive Boolean @default(true)
+  Asset    Asset[]
+}
+
+model Maintenance {
+  id               Int      @id @default(autoincrement())
+  maintenance_type String
+  date             DateTime
+  performed_by     String
+  notes            String
+  isActive         Boolean  @default(true)
+  assetId          Int
+  asset            Asset    @relation(fields: [assetId], references: [id])
+}
