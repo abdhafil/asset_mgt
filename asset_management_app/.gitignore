@@ -33,3 +33,5 @@ coverage/
 # Mac / Linux / Windows OS files
 .DS_Store
 Thumbs.db
+
+node_modules/
