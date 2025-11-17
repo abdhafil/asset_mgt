@@ -1,26 +1,35 @@
-# Flutter/Dart/Pub stuff
+# Flutter & Dart
 .dart_tool/
 .packages
 .pub/
 build/
 .melos_tool/
 
-# iOS
-ios/Flutter/.last_build_id
-ios/Pods/
-Podfile.lock
-
 # Android
 android/.gradle/
 android/.idea/
 android/local.properties
+android/key.properties
 
-# Environment files
-.env
+# iOS
+ios/Pods/
+ios/Flutter/.last_build_id
+Podfile.lock
 
+# Web
+web/.dart_tool/
 
-node_modules/
-build/
-.dart_tool/
-.env
+# VS Code
 .vscode/
+
+# Env files
+.env
+
+# Generated
+coverage/
+*.lock
+*.log
+
+# Mac / Linux / Windows OS files
+.DS_Store
+Thumbs.db

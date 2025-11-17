@@ -1,4 +1,34 @@
+# Node modules
 node_modules/
-uploads/
+
+# Environment variables
 .env
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Build / Dist
+dist/
+build/
+
+# Uploads (generated files)
+uploads/
+
+# VS Code
 .vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Prisma
+server/prisma/*.db
+server/prisma/*.sqlite
+
+# Temp
+.tmp/
+temp/
