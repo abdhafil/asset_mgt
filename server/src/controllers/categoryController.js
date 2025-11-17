@@ -26,6 +26,7 @@ export const viweAllCategory=async(req,res)=>{
 export const categoryToggle=async(req,res)=>{
     const {id}=req.params;
     try {
+        console.log(id);
         const category=await prisma.category.findUnique({
             where:{id:Number(id)},
         });
@@ -52,32 +53,56 @@ export const categoryToggle=async(req,res)=>{
 };
 
 
-export const addcategory=async(req,res)=>{
-    const {name} = req.body;
-    try {
-        const existingCategory=await prisma.category.findUnique({
-            where:{name:name},
-        });
+// export const addcategory=async(req,res)=>{
+//     const {name} = req.body;
+//     try {
+//         const existingCategory=await prisma.category.findUnique({
+//             where:{name:name},
+//         });
 
-        if (existingCategory) {
-            return res.status(400).json({message:"Category name already exists"});
-        }
+//         if (existingCategory) {
+//             return res.status(400).json({message:"Category name already exists"});
+//         }
 
-        const newCategory=await prisma.category.create({
-            data:{name}
-        });
-        return res.status(201).json({ message: "Category added successfully", newCategory });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
+//         const newCategory=await prisma.category.create({
+//             data:{name}
+//         });
+//         return res.status(201).json({ message: "Category added successfully", newCategory });
+//     } catch (error) {
+//         res.status(500).json({ error: error.message });
+//     }
+// }
+
+export const addcategory = async (req, res) => {
+  try {
+    console.log("Incoming headers:", req.headers);
+    console.log("Incoming body:", req.body)
+    
+    const body = req.body ?? {};
+    const name = body.name ?? body.category_name ?? body.categoryName;
+
+    if (!name || typeof name !== "string" || name.trim() === "") {
+      return res.status(400).json({ error: "Missing or invalid 'name' in request body" });
     }
-}
+
+    const newCategory = await prisma.category.create({
+      data: { name: name.trim() },
+    });
+
+    return res.status(201).json(newCategory);
+  } catch (err) {
+    console.error("addcategory error:", err);
+    return res.status(500).json({ error: err.message || "Internal server error" });
+  }
+};
+
 
 export const deleteCategory=async(req,res)=>{
     const {id} = req.params;
     try {
-        const deletedCategory=await prisma.category.update({
+        const deletedCategory=await prisma.category.delete({
             where:{id:Number(id)},
-            data:{isActive:false},
+            // data:{isActive:false},
         });
     res.json({message:"Category deleted successfully",deletedCategory});
     } catch (error) {

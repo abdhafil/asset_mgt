@@ -17,10 +17,11 @@ model Asset {
   id          Int           @id @default(autoincrement())
   name        String        @unique
   location    String
-  image       String?
+  imageUrl    String?
   description String
   categoryId  Int
   isActive    Boolean       @default(true)
+  isSaved     Boolean       @default(true)
   category    Category      @relation(fields: [categoryId], references: [id])
   maintenance Maintenance[]
 }

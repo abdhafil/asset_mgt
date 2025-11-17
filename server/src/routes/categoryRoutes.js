@@ -7,6 +7,6 @@ router.get("/view_active",viweActiveCategory);
 router.get("/view/all",viweAllCategory);
 router.put("/toggle/isActive/:id",categoryToggle);
 router.post("/add",addcategory);
-router.put("/delete/:id",deleteCategory);
+router.delete("/delete/:id",deleteCategory);
 
 export default router;

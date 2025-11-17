@@ -1,4 +1,6 @@
+import 'package:asset_management_app/screens/asset/add_asset_pasge.dart';
 import 'package:asset_management_app/screens/asset/asset_page.dart';
+import 'package:asset_management_app/services/asset_service.dart';
 import 'package:flutter/material.dart';
 
 class HomePage extends StatefulWidget {
@@ -9,97 +11,111 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  List<Map<String, dynamic>> assets = [
-    {
-      'name': 'MacBook Pro 16"',
-      'image':
-          'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=800&q=80',
-    },
-    {
-      'name': 'Dell Ultrasharp Monitor',
-      'image':
-          'https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=800&q=80',
-    },
-    {
-      'name': 'Ergonomic Office Chair',
-      'image':
-          'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=800&q=80',
-    },
-    {
-      'name': 'Mechanical Keyboard',
-      'image':
-          'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=800&q=80',
-    },
-    {
-      'name': 'Wireless Mouse',
-      'image':
-          'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=800&q=80',
-    },
-    {
-      'name': 'HP Laser Printer',
-      'image':
-          'https://images.unsplash.com/photo-1588702547923-7093a6c3ba33?auto=format&fit=crop&w=800&q=80',
-    },
-    {
-      'name': 'Noise-Cancelling Headphones',
-      'image':
-          'https://images.unsplash.com/photo-1593642532973-d31b6557fa68?auto=format&fit=crop&w=800&q=80',
-    },
-    {
-      'name': 'Projector',
-      'image':
-          'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=800&q=80',
-    },
-    {
-      'name': 'Server Rack',
-      'image':
-          'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=800&q=80',
-    },
-    {
-      'name': 'WiFi Router',
-      'image':
-          'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=800&q=80',
-    },
-  ];
-
+  List<Map<String, dynamic>> assets = [];
+  final AssetService assetService = AssetService();
   bool isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    // Call backend here in future
-    _loadAssets();
+    loadAssets();
   }
 
-  // Simulate API call
-  Future<void> _loadAssets() async {
+  Future<void> loadAssets() async {
     setState(() => isLoading = true);
 
-    await Future.delayed(const Duration(seconds: 2)); // simulate delay
+    final data = await assetService.fetchAssets();
 
-    // When backend is ready, fetch real data here
-    // final response = await Dio().get("${ApiConfig.baseUrl}/assets");
-    // assets = response.data;
+    setState(() {
+      assets = data;
+      isLoading = false;
+    });
+  }
 
-    setState(() => isLoading = false);
+  Future<void> confirmDelete(int index) async {
+    final asset = assets[index];
+    final int id = asset['id'];
+    final bool newStatus = !asset['isActive'];
+
+    final success = await assetService.assetDeleteToggle(
+      id: id,
+      isActive: newStatus,
+    );
+
+    if (success) {
+      await loadAssets();
+      setState(() {
+        assets[index]['isActive'] = newStatus;
+      });
+
+      final status = newStatus ? "activated" : "deactivated";
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('asset "${asset['name']}" $status')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Failed to update category")),
+      );
+    }
+  }
+
+  Future<void> saveToggle(int index) async {
+    final category = assets[index];
+    final int id = category['id'];
+    final bool newStatus = !category['isSaved'];
+
+    final success = await assetService.assetSaveToggle(
+      id: id,
+      isSaved: newStatus,
+    );
+
+    if (success) {
+      setState(() {
+        assets[index]['isSaved'] = newStatus;
+      });
+
+      final status = newStatus ? "Unsaved" : "Saved";
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Category "${category['name']}" $status')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Failed to add asset to saved")),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final String baseUrl = assetService.baseUrl;
+
     return Scaffold(
       backgroundColor: const Color(0xFF0F1227),
       appBar: AppBar(
-        // title: const Text("Assets"),
         backgroundColor: Colors.transparent,
-        // elevation: 0,
+        leading: IconButton(
+          onPressed: loadAssets,
+          icon: const Icon(Icons.refresh),
+          tooltip: 'Reload',
+        ),
         actions: [
           IconButton(
-            onPressed: _loadAssets,
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Reload',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => AddAssetPage()),
+              ).then((_) {
+                loadAssets();
+              });
+            },
+            icon: const Icon(Icons.add),
+            tooltip: 'Add Asset',
           ),
         ],
       ),
+
       body: isLoading
           ? const Center(
               child: CircularProgressIndicator(color: Colors.blueAccent),
@@ -108,74 +124,95 @@ class _HomePageState extends State<HomePage> {
               padding: const EdgeInsets.all(12),
               child: GridView.builder(
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2, // 2 columns
+                  crossAxisCount: 2,
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
-                  childAspectRatio: 0.8, // adjust card height
+                  childAspectRatio: 0.8,
                 ),
                 itemCount: assets.length,
                 itemBuilder: (context, index) {
                   final asset = assets[index];
                   return _AssetCard(
-                    name: asset['name']!,
-                    image: asset['image']!,
+                    id: asset['id'],
+                    name: asset['name'] ?? "Unknown",
+                    imageUrl: asset['imageUrl'],
+                    isSaved: asset['isSaved'],
+                    description: asset['description'],
+                    baseUrl: baseUrl,
+                    onDelete: (id) => confirmDelete(index),
+                    onSave: (id, newStatus) => saveToggle(index),
                   );
                 },
               ),
             ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xFF6A5CFF),
-        onPressed: () {
-          // TODO: navigate to Add Asset screen
-        },
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
     );
   }
 }
 
 class _AssetCard extends StatefulWidget {
+  final int id;
   final String name;
-  final String image;
+  final String? imageUrl;
+  final String baseUrl;
+  final bool isSaved;
+  final String description;
+  final Function(int id) onDelete;
+  final Function(int id, bool newStatus) onSave;
 
-  const _AssetCard({required this.name, required this.image, super.key});
+  const _AssetCard({
+    required this.id,
+    required this.name,
+    required this.imageUrl,
+    required this.baseUrl,
+    required this.isSaved,
+    required this.onDelete,
+    required this.onSave,
+    required this.description,
+    super.key,
+  });
 
   @override
   State<_AssetCard> createState() => _AssetCardState();
 }
 
 class _AssetCardState extends State<_AssetCard> {
-  bool isSaved = false; // track save state
+  late bool isSaved;
+
+  @override
+  void initState() {
+    super.initState();
+    isSaved = widget.isSaved;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final String? imageUrl = widget.imageUrl;
+
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) =>
-                AssetPage(name: widget.name, image: widget.image),
+            builder: (_) => AssetPage(
+              name: widget.name,
+              image: widget.imageUrl ?? "",
+              description: widget.description,
+              baseUrl: widget.baseUrl,
+              assetId: widget.id,
+            ),
           ),
         );
       },
-
       child: Container(
         decoration: BoxDecoration(
           gradient: const LinearGradient(
+            colors: [Color(0xFF1B254A), Color(0xFF2A3F7A)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF1B254A), Color(0xFF2A3F7A)],
           ),
           borderRadius: BorderRadius.circular(18),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.3),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
-            ),
-          ],
         ),
+
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -183,39 +220,47 @@ class _AssetCardState extends State<_AssetCard> {
               flex: 6,
               child: Stack(
                 children: [
-                  // Asset image
                   ClipRRect(
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(18),
                     ),
-                    child: Image.network(
-                      widget.image,
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      height: double.infinity,
+                    child: (imageUrl == null || imageUrl.isEmpty)
+                        ? Image.asset(
+                            "assets/images/insert-picture-icon.png",
+                            fit: BoxFit.cover,
+                          )
+                        : Image.network(
+                            "${widget.baseUrl}$imageUrl",
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                            height: double.infinity,
+                          ),
+                  ),
+
+                  // DELETE BUTTON
+                  Positioned(
+                    top: 8,
+                    left: 0,
+                    child: IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      onPressed: () => widget.onDelete(widget.id),
                     ),
                   ),
 
-                  // Save icon
+                  // SAVE BUTTON
                   Positioned(
                     top: 8,
                     right: 0,
-                    child: Container(
-                      // decoration: BoxDecoration(
-                      //   color: Colors.black.withOpacity(0.5),
-                      //   shape: BoxShape.circle,
-                      // ),
+                    child: GestureDetector(
                       child: IconButton(
                         icon: Icon(
-                          isSaved ? Icons.bookmark : Icons.bookmark_border,
-                          color: isSaved
-                              ? const Color.fromARGB(255, 238, 4, 4)
-                              : Colors.white,
+                          isSaved ? Icons.bookmark_border : Icons.bookmark,
+                          color: isSaved ? Colors.white : Colors.red,
                         ),
                         onPressed: () {
-                          setState(() {
-                            isSaved = !isSaved;
-                          });
+                          final newStatus = !isSaved;
+                          setState(() => isSaved = newStatus);
+                          widget.onSave(widget.id, newStatus);
                         },
                       ),
                     ),
@@ -223,22 +268,18 @@ class _AssetCardState extends State<_AssetCard> {
                 ],
               ),
             ),
+
             Expanded(
               flex: 4,
               child: Padding(
                 padding: const EdgeInsets.all(8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  widget.name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),

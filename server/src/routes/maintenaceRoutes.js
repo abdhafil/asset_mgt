@@ -3,8 +3,8 @@ import { addMaintenance, deleteMaintenace, updateMaintenace, viweMaintenaces } f
 
 const router = express.Router();
 
-router.get("/view",viweMaintenaces);
-router.post("/add",addMaintenance);
+router.get("/view/:id",viweMaintenaces);
+router.post("/add/:id",addMaintenance);
 router.put("/update/:id",updateMaintenace);
 router.put("/delete/:id",deleteMaintenace);
 

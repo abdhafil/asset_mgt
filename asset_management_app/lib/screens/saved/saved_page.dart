@@ -1,4 +1,5 @@
 import 'package:asset_management_app/screens/asset/asset_page.dart';
+import 'package:asset_management_app/services/asset_service.dart';
 import 'package:flutter/material.dart';
 
 class SavedPage extends StatefulWidget {
@@ -9,27 +10,85 @@ class SavedPage extends StatefulWidget {
 }
 
 class _SavedPageState extends State<SavedPage> {
-  // Example saved assets (you can replace with backend data later)
-  List<Map<String, String>> savedAssets = [
-    {
-      'name': 'MacBook Pro 16"',
-      'image':
-          'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=800&q=80',
-    },
-    {
-      'name': 'Dell Ultrasharp Monitor',
-      'image':
-          'https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=800&q=80',
-    },
-    {
-      'name': 'Wireless Mouse',
-      'image':
-          'https://images.unsplash.com/photo-1588702547923-7093a6c3ba33?auto=format&fit=crop&w=800&q=80',
-    },
-  ];
+  final AssetService assetService = AssetService();
+  bool isLoading = false;
+
+  List<Map<String, dynamic>> savedAssets = [];
+
+  @override
+  void initState() {
+    super.initState();
+    loadSavedAssets();
+  }
+
+  Future<void> loadSavedAssets() async {
+    setState(() => isLoading = true);
+    final data = await assetService.fetchSavedAssets();
+    setState(() {
+      savedAssets = data;
+      isLoading = false;
+    });
+  }
+
+  Future<void> confirmDelete(int index) async {
+    final asset = savedAssets[index];
+    final int id = asset['id'];
+    final bool newStatus = !asset['isActive'];
+
+    final success = await assetService.assetDeleteToggle(
+      id: id,
+      isActive: newStatus,
+    );
+
+    if (success) {
+      await loadSavedAssets();
+      setState(() {
+        savedAssets[index]['isActive'] = newStatus;
+      });
+
+      final status = newStatus ? "activated" : "deactivated";
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('asset "${asset['name']}" $status')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Failed to update category")),
+      );
+    }
+  }
+
+  Future<void> removeSaved(int index) async {
+    final category = savedAssets[index];
+    final int id = category['id'];
+    final bool newStatus = !category['isSaved'];
+
+    final success = await assetService.assetSaveToggle(
+      id: id,
+      isSaved: newStatus,
+    );
+
+    if (success) {
+      setState(() {
+        savedAssets[index]['isSaved'] = newStatus;
+      });
+
+      final status = newStatus ? "Unsaved" : "Saved";
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Category "${category['name']}" $status')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Failed to add asset to saved")),
+      );
+    }
+    loadSavedAssets();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final String baseUrl = assetService.baseUrl;
     return Scaffold(
       backgroundColor: const Color(0xFF0F1227),
       appBar: AppBar(
@@ -61,18 +120,15 @@ class _SavedPageState extends State<SavedPage> {
                 itemBuilder: (context, index) {
                   final asset = savedAssets[index];
                   return _SavedAssetCard(
-                    name: asset['name']!,
-                    image: asset['image']!,
-                    onRemove: () {
-                      setState(() {
-                        savedAssets.removeAt(index);
-                      });
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('${asset['name']} removed from saved'),
-                        ),
-                      );
-                    },
+                    id: asset['id'],
+                    name: asset['name'] ?? "Unknown",
+                    imageUrl: asset['imageUrl'],
+                    isSaved: asset['isSaved'],
+                    description: asset['description'],
+                    baseUrl: baseUrl,
+                    onDelete: (id) => confirmDelete(index),
+                    onRemove: (id) => removeSaved(index),
+                    onReload: () => loadSavedAssets(),
                   );
                 },
               ),
@@ -81,25 +137,50 @@ class _SavedPageState extends State<SavedPage> {
   }
 }
 
-class _SavedAssetCard extends StatelessWidget {
+class _SavedAssetCard extends StatefulWidget {
+  final int id;
   final String name;
-  final String image;
-  final VoidCallback onRemove;
+  final String? imageUrl;
+  final String baseUrl;
+  final bool isSaved;
+  final String description;
+  final Function(int id) onDelete;
+  final Function(int id) onRemove;
+  final Function() onReload;
 
   const _SavedAssetCard({
+    required this.id,
     required this.name,
-    required this.image,
+    required this.imageUrl,
+    required this.baseUrl,
+    required this.isSaved,
+    required this.onDelete,
     required this.onRemove,
+    required this.onReload,
+    required this.description,
+    super.key,
   });
 
   @override
+  State<_SavedAssetCard> createState() => _SavedAssetCardState();
+}
+
+class _SavedAssetCardState extends State<_SavedAssetCard> {
+  @override
   Widget build(BuildContext context) {
+    final String? imageUrl = widget.imageUrl;
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => AssetPage(name: name, image: image),
+            builder: (_) => AssetPage(
+              name: widget.name,
+              image: widget.imageUrl ?? "",
+              description: widget.description,
+              baseUrl: widget.baseUrl,
+              assetId: widget.id,
+            ),
           ),
         );
       },
@@ -131,11 +212,25 @@ class _SavedAssetCard extends StatelessWidget {
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(18),
                     ),
-                    child: Image.network(
-                      image,
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      height: double.infinity,
+                    child: (imageUrl == null || imageUrl.isEmpty)
+                        ? Image.asset(
+                            "assets/images/insert-picture-icon.png",
+                            fit: BoxFit.cover,
+                          )
+                        : Image.network(
+                            "${widget.baseUrl}$imageUrl",
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                            height: double.infinity,
+                          ),
+                  ),
+
+                  Positioned(
+                    top: 8,
+                    left: 0,
+                    child: IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      onPressed: () => widget.onDelete(widget.id),
                     ),
                   ),
 
@@ -145,7 +240,7 @@ class _SavedAssetCard extends StatelessWidget {
                     right: 8,
                     child: IconButton(
                       icon: const Icon(Icons.bookmark, color: Colors.red),
-                      onPressed: onRemove,
+                      onPressed: () => widget.onRemove(widget.id),
                     ),
                   ),
                 ],
@@ -156,7 +251,7 @@ class _SavedAssetCard extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.all(8),
                 child: Text(
-                  name,
+                  widget.name,
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,

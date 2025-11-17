@@ -1,37 +1,78 @@
+import 'package:asset_management_app/main.dart';
 import 'package:asset_management_app/screens/maintenance/add_maintenance_page.dart';
+import 'package:asset_management_app/services/maintenance_service.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 class AssetPage extends StatefulWidget {
+  final int assetId;
   final String name;
   final String image;
+  final String description;
+  final String baseUrl;
 
-  const AssetPage({super.key, required this.name, required this.image});
+  const AssetPage({
+    super.key,
+    required this.assetId,
+    required this.name,
+    required this.description,
+    required this.image,
+    required this.baseUrl,
+  });
 
   @override
   State<AssetPage> createState() => _AssetPageState();
 }
 
 class _AssetPageState extends State<AssetPage> {
-  List<Map<String, String>> maintenanceList = [
-    {
-      'maintenance_type': 'Oil Change',
-      'date': '2025-10-20',
-      'performed_by': 'Hafil',
-      'notes': 'Performed oil change and basic service check.',
-    },
-    {
-      'maintenance_type': 'Tire Replacement',
-      'date': '2025-10-21',
-      'performed_by': 'Hafil',
-      'notes': 'Replaced both rear tires and checked alignment.',
-    },
-    {
-      'maintenance_type': 'Battery Check',
-      'date': '2025-10-22',
-      'performed_by': 'Hafil',
-      'notes': 'Battery condition good; terminals cleaned.',
-    },
-  ];
+  final MaintenanceService maintenanceService = MaintenanceService();
+  List<Map<String, dynamic>> maintenanceList = [];
+  bool isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    loadMaintenance();
+  }
+
+  Future<void> loadMaintenance() async {
+    setState(() => isLoading = true);
+
+    final data = await maintenanceService.fetchMaintenance(
+      assetId: widget.assetId,
+    );
+
+    setState(() {
+      maintenanceList = data;
+      isLoading = false;
+    });
+  }
+
+  Future<void> deleteManitenance(int index) async {
+    final maintenance = maintenanceList[index];
+    final int id = maintenance['id'];
+    final bool newStatus = !maintenance['isActive'];
+
+    final success = await maintenanceService.maintenanceDeleteToggle(
+      id: id,
+      isActive: newStatus,
+    );
+
+    if (success) {
+      await loadMaintenance();
+      setState(() {
+        maintenanceList[index]['isActive'] = newStatus;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            ' Maintenance:-"${maintenance['maintenance_type']}" is deleted',
+          ),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -82,7 +123,10 @@ class _AssetPageState extends State<AssetPage> {
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(25),
-                child: Image.network(widget.image, fit: BoxFit.contain),
+                child: Image.network(
+                  "${widget.baseUrl}${widget.image}",
+                  fit: BoxFit.contain,
+                ),
               ),
             ),
 
@@ -104,9 +148,8 @@ class _AssetPageState extends State<AssetPage> {
                 color: const Color(0xFF1E2556),
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: const Text(
-                "The LR01 uses the same design as the most iconic lines from PEUGEOT Cycles’ 130-year history and combines it with agile, dynamic performance. "
-                "It’s ideal for city use, with a lightweight aluminum frame and a 16-speed Shimano Claris drivetrain.",
+              child: Text(
+                widget.description,
                 style: TextStyle(
                   color: Colors.white70,
                   height: 1.6,
@@ -162,12 +205,13 @@ class _AssetPageState extends State<AssetPage> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    "Date: ${item['date']!}",
+                                    "Date: ${DateFormat('yyyy-MM-dd').format(DateTime.parse(item['date']))}",
                                     style: const TextStyle(
                                       color: Colors.white70,
                                       fontSize: 13,
                                     ),
                                   ),
+
                                   Text(
                                     "Performed by: ${item['performed_by']!}",
                                     style: const TextStyle(
@@ -191,16 +235,7 @@ class _AssetPageState extends State<AssetPage> {
                                 color: Colors.redAccent,
                               ),
                               onPressed: () {
-                                setState(() {
-                                  maintenanceList.removeAt(index);
-                                });
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      "${item['maintenance_type']} deleted",
-                                    ),
-                                  ),
-                                );
+                                deleteManitenance(index);
                               },
                             ),
                           ],
@@ -209,19 +244,22 @@ class _AssetPageState extends State<AssetPage> {
                     }).toList(),
                   ),
 
-            const SizedBox(height: 100), // spacing so button doesn't overlap
+            const SizedBox(height: 100),
           ],
         ),
       ),
 
-      // ✅ Floating button stays fixed
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: const Color(0xFF6A5CFF),
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const AddMaintenancePage()),
-          );
+            MaterialPageRoute(
+              builder: (context) => AddMaintenancePage(assetId: widget.assetId),
+            ),
+          ).then((_) {
+            loadMaintenance();
+          });
         },
         icon: const Icon(Icons.add, color: Colors.white),
         label: const Text(

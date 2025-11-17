@@ -1,3 +1,4 @@
+import 'package:asset_management_app/services/category_services.dart';
 import 'package:flutter/material.dart';
 
 class CategoryPage extends StatefulWidget {
@@ -10,34 +11,97 @@ class CategoryPage extends StatefulWidget {
 class _CategoryPageState extends State<CategoryPage> {
   final TextEditingController _categoryController = TextEditingController();
 
-  // Each category now has a name + active state
-  final List<Map<String, dynamic>> _categories = [];
+  final CategoryServices _categoryServices = CategoryServices();
+  bool _isLoading = false;
 
-  void _addCategory() {
+  List<Map<String, dynamic>> _categories = [];
+
+  Future<void> _addCategory() async {
     final name = _categoryController.text.trim();
     if (name.isEmpty) return;
 
-    setState(() {
-      _categories.add({'name': name, 'isActive': true});
-      _categoryController.clear();
-    });
+    setState(() => _isLoading = true);
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('Category "$name" added!')));
+    final success = await _categoryServices.addCategory(name: name);
+
+    if (!mounted) return;
+
+    setState(() => _isLoading = false);
+
+    if (success) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Category added successfully!")));
+    } else {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Failed to add category")));
+    }
   }
 
-  void _toggleCategory(int index) {
+  Future<void> loadCategories() async {
+    final data = await _categoryServices.fetchAllCategory();
     setState(() {
-      _categories[index]['isActive'] = !_categories[index]['isActive'];
+      _categories = data;
     });
+  }
 
-    final status = _categories[index]['isActive'] ? "activated" : "deactivated";
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Category "${_categories[index]['name']}" $status'),
-      ),
+  @override
+  void initState() {
+    super.initState();
+    loadCategories();
+  }
+
+  Future<void> _toggleCategory(int index) async {
+    final category = _categories[index];
+    final int id = category['id'];
+    final bool newStatus = !category['isActive'];
+
+    // 👉 Update backend first
+    final success = await _categoryServices.categoryToggle(
+      id: id,
+      isActive: newStatus,
     );
+
+    if (success) {
+      // 👉 Update UI only if backend succeeds
+      setState(() {
+        _categories[index]['isActive'] = newStatus;
+      });
+
+      final status = newStatus ? "activated" : "deactivated";
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Category "${category['name']}" $status')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Failed to update category")),
+      );
+    }
+  }
+
+  Future<void> _confirmDelete(int index) async {
+    final category = _categories[index];
+    final int id = category['id'];
+
+    final success = await _categoryServices.categoryDelete(id: id);
+
+    if (success) {
+      setState(() {
+        _categories.removeAt(index);
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Category "${category['name']}" deleted successfully'),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Failed to delete category")),
+      );
+    }
   }
 
   @override
@@ -95,22 +159,25 @@ class _CategoryPageState extends State<CategoryPage> {
                         ),
                       ),
                       const SizedBox(width: 10),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF6A5CFF),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 14,
+                      Material(
+                        color: Colors.transparent,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF6A5CFF),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 14,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                          onPressed: _addCategory,
+                          child: const Text(
+                            "Add",
+                            style: TextStyle(color: Colors.white),
                           ),
                         ),
-                        onPressed: _addCategory,
-                        child: const Text(
-                          "Add",
-                          style: TextStyle(color: Colors.white),
-                         ),
                       ),
                     ],
                   ),
@@ -156,11 +223,25 @@ class _CategoryPageState extends State<CategoryPage> {
                               category['name'],
                               style: const TextStyle(color: Colors.white),
                             ),
-                            trailing: Switch(
-                              activeColor: const Color(0xFF6A5CFF),
-                              inactiveThumbColor: Colors.grey,
-                              value: isActive,
-                              onChanged: (value) => _toggleCategory(index),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // Delete button
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.delete,
+                                    color: Colors.redAccent,
+                                  ),
+
+                                  onPressed: () => _confirmDelete(index),
+                                ),
+                                Switch(
+                                  activeColor: const Color(0xFF6A5CFF),
+                                  inactiveThumbColor: Colors.grey,
+                                  value: isActive,
+                                  onChanged: (value) => _toggleCategory(index),
+                                ),
+                              ],
                             ),
                             subtitle: Text(
                               isActive ? "Active" : "Inactive",

@@ -4,10 +4,25 @@ const prisma=new PrismaClient();
 export const viweMaintenaces=async(req,res)=>{
     const {id}=req.params;
     try {
-        const maintenances=await prisma.maintenance.findMany({
-            where:{isActive:true},
+        const asset=await prisma.asset.findUnique({
+            where:{id:Number(id)},
         });
-        res.json(maintenances)
+        if (!asset) {
+            return res.status(404).json({message:"Asset not found"});
+        } 
+
+        if(!asset.isActive) {
+            return res.status(400).json({message:"Asset is not active "});
+        }
+        const maintenances=await prisma.maintenance.findMany({
+            where:{assetId:Number(id),isActive:true},
+        });
+        if (!maintenances) {
+            console.log("print hello");
+            return res.status(404).json({message:"Maintenances not found"});
+        }else{
+            res.json(maintenances)
+        }
     } catch (error) {
         res.status(500).json({error:error.message});
     }

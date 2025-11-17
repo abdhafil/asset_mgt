@@ -1,8 +1,10 @@
+import 'package:asset_management_app/services/maintenance_service.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 class AddMaintenancePage extends StatefulWidget {
-  const AddMaintenancePage({super.key});
+  final int assetId;
+  const AddMaintenancePage({super.key, required this.assetId});
 
   @override
   State<AddMaintenancePage> createState() => _AddMaintenancePageState();
@@ -13,12 +15,62 @@ class _AddMaintenancePageState extends State<AddMaintenancePage> {
 
   final TextEditingController _performedByController = TextEditingController();
   final TextEditingController _notesController = TextEditingController();
-  final TextEditingController _assetIdController = TextEditingController();
   final TextEditingController _maintenanceTypeController =
       TextEditingController();
 
   DateTime? _selectedDate;
-  bool _isActive = true;
+  bool isLoading = false;
+
+  final MaintenanceService maintenanceService = MaintenanceService();
+
+  Future<void> submitForm() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    if (_selectedDate == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Please select a date")));
+      return;
+    }
+
+    final performed_by = _performedByController.text.trim();
+    final notes = _notesController.text.trim();
+    final maintenance_type = _maintenanceTypeController.text.trim();
+    final date = _selectedDate!;
+    final id = widget.assetId;
+
+    setState(() => isLoading = true);
+
+    final success = await maintenanceService.addMaintenance(
+      maintenance_type: maintenance_type,
+      performed_by: performed_by,
+      notes: notes,
+      date: date,
+      assetId: id,
+    );
+
+    if (!mounted) return;
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Maintenance added successfully!")),
+      );
+
+      _performedByController.clear();
+      _notesController.clear();
+      _maintenanceTypeController.clear();
+
+      setState(() {
+        _selectedDate = null;
+        isLoading = false;
+      });
+      return;
+    } else {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Failed to add Maintenance")));
+    }
+  }
 
   Future<void> _pickDate() async {
     final DateTime? picked = await showDatePicker(
@@ -43,34 +95,6 @@ class _AddMaintenancePageState extends State<AddMaintenancePage> {
       setState(() {
         _selectedDate = picked;
       });
-    }
-  }
-
-  void _submitForm() {
-    if (_formKey.currentState!.validate()) {
-      if (_selectedDate == null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Please select a date')));
-        return;
-      }
-
-      final newMaintenance = {
-        "date": DateFormat("yyyy-MM-dd HH:mm:ss").format(_selectedDate!),
-        "performed_by": _performedByController.text,
-        "notes": _notesController.text,
-        "assetId": int.tryParse(_assetIdController.text) ?? 0,
-        "isActive": _isActive,
-        "maintenance_type": _maintenanceTypeController.text,
-      };
-
-      print("Maintenance Added: $newMaintenance");
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Maintenance added successfully!')),
-      );
-
-      Navigator.pop(context);
     }
   }
 
@@ -116,15 +140,6 @@ class _AddMaintenancePageState extends State<AddMaintenancePage> {
                 label: "Performed By",
                 hint: "Enter technician name",
                 controller: _performedByController,
-              ),
-              const SizedBox(height: 20),
-
-              // --- Asset ID ---
-              _buildInputField(
-                label: "Asset ID",
-                hint: "Enter asset ID",
-                controller: _assetIdController,
-                keyboardType: TextInputType.number,
               ),
               const SizedBox(height: 20),
 
@@ -197,7 +212,7 @@ class _AddMaintenancePageState extends State<AddMaintenancePage> {
                     elevation: 10,
                     shadowColor: Colors.blueAccent.withOpacity(0.4),
                   ),
-                  onPressed: _submitForm,
+                  onPressed: submitForm,
                   child: const Text(
                     "Save Maintenance",
                     style: TextStyle(
